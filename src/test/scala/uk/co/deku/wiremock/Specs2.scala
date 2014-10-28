@@ -20,7 +20,7 @@ class Specs2 extends Specification {
   val wireMockServer = new WireMockServer(wireMockConfig().port(Port))
 
   step {
-    WireMock.configureFor("localhost", Port) //Must have it for any port other than 8080
+    WireMock.configureFor(Host, Port) //Must have it for any port other than 8080
     wireMockServer.start()
   }
 
