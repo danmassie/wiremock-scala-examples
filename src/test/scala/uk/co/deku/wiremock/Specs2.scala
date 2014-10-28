@@ -1,30 +1,33 @@
 package uk.co.deku.wiremock
 
-import java.util.concurrent.TimeUnit
-import scala.concurrent.Await
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration.Duration
-import org.specs2.mutable.{ BeforeAfter, Specification }
 import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.client.WireMock
 import com.github.tomakehurst.wiremock.client.WireMock._
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration._
-import dispatch.{ Http, url }
+import com.ning.http.client.Response
+import dispatch.{Http, url}
+import org.specs2.matcher.Matcher
+import org.specs2.mutable.{Before, Specification}
+
+import scala.concurrent.ExecutionContext.Implicits.global
 
 class Specs2 extends Specification {
+  sequential
 
   val Port = 8080
   val Host = "localhost"
 
-  trait StubServer extends BeforeAfter {
-    val wireMockServer = new WireMockServer(wireMockConfig().port(Port))
+  val wireMockServer = new WireMockServer(wireMockConfig().port(Port))
 
-    def before = {
-      wireMockServer.start()
-      WireMock.configureFor(Host, Port)
-    }
+  step {
+    WireMock.configureFor("localhost", Port) //Must have it for any port other than 8080
+    wireMockServer.start()
+  }
 
-    def after = wireMockServer.stop()
+  trait StubServer extends Before {
+    def before = WireMock.reset()
+    
+    def haveStatus(code: Int): Matcher[Response] = ((_:Response).getStatusCode) ^^ be_==(code)
   }
   
   "WireMock" should {
@@ -36,10 +39,11 @@ class Specs2 extends Specification {
             .withStatus(200)))
 
       val request = url(s"http://$Host:$Port$path").GET
-      val responseFuture = Http(request)
-
-      val response = Await.result(responseFuture, Duration(100, TimeUnit.MILLISECONDS))
-      response.getStatusCode mustEqual 200
+      Http(request) must haveStatus(200).await
     }
+  }
+
+  step {
+    wireMockServer.stop()
   }
 }
